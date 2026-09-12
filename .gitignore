@@ -1,0 +1,16 @@
+# Build and runtime output
+dist/
+realease/
+Downloads/
+data/
+quality-preference.txt
+*.log
+*.zip
+*.exe
+bin/
+obj/
+__pycache__/
+*.py[cod]
+
+# Local dependency staging; releases contain these binaries, Git does not.
+third_party/
