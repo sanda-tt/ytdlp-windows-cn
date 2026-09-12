@@ -4,7 +4,7 @@
 
 ## 下载与使用
 
-到 GitHub 的 **Releases** 下载 `ytdlp-windows-cn-1.0.0.zip`，解压后双击 `启动下载器.exe`：选择清晰度，然后在打开的中文界面粘贴网页地址、点击“增加”、再开始下载。
+到 GitHub 的 **Releases** 下载 `ytdlp-windows-cn-1.0.1.zip`，解压后双击 `启动下载器.exe`：选择清晰度，然后在打开的中文界面粘贴网页地址、点击“增加”、再开始下载。
 
 发布包不依赖系统安装的 Python、FFmpeg 或 aria2。所有配置保存在包内的 `data` 文件夹，视频默认保存到包内的 `Downloads` 文件夹；移动整个文件夹后，再从 `启动下载器.exe` 打开即可更新路径。
 
@@ -13,6 +13,7 @@
 - 中文 yt-dlg 图形界面与清晰度选择。
 - 普通 HTTP 媒体使用 aria2 多连接下载；HLS/DASH 保持 yt-dlp 原生分片下载。
 - aria2 出错时自动回退到 yt-dlp 原生下载器。
+- 成功任务中的非致命 yt-dlp 提示不会再被 yt-dlg 误标为 Warning；最终失败仍显示 Error。
 - 对原生 yt-dlp 不支持的普通网页，静态提取 video/source、播放器配置、同源脚本和 iframe 中的 m3u8、MPD 或直接媒体地址，再交回 yt-dlp 下载。
 - FFmpeg 自动合并分离的音视频流。
 

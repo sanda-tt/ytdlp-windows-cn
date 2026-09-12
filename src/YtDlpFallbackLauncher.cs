@@ -50,16 +50,19 @@ static class YtDlpFallbackLauncher {
             NormalizeEta(match.Groups["eta"].Value));
     }
 
-    static void Relay(string line, bool stderr, bool translateAria) {
+    static void RelayStdout(string line, bool translateAria) {
         string translated = translateAria ? TranslateAriaProgress(line) : null;
         lock (ConsoleLock) {
             if (translated != null) Console.Out.WriteLine(translated);
-            else if (stderr) Console.Error.WriteLine(line);
             else Console.Out.WriteLine(line);
         }
     }
 
-    static int Run(IEnumerable<string> args, bool translateAria) {
+    // yt-dlg treats every stderr line that begins with WARNING: or ERROR: as a
+    // terminal Warning, even when yt-dlp exits successfully. Keep diagnostics
+    // until the final attempt has finished; progress from aria2 still needs to
+    // be relayed immediately so the GUI remains responsive.
+    static int Run(IEnumerable<string> args, bool translateAria, List<string> diagnostics) {
         using (var stdoutDone = new ManualResetEvent(false))
         using (var stderrDone = new ManualResetEvent(false)) {
             var process = new Process { StartInfo = new ProcessStartInfo {
@@ -71,10 +74,18 @@ static class YtDlpFallbackLauncher {
             RedirectStandardError = true,
         }};
             process.OutputDataReceived += delegate(object sender, DataReceivedEventArgs e) {
-                if (e.Data == null) stdoutDone.Set(); else Relay(e.Data, false, translateAria);
+                if (e.Data == null) stdoutDone.Set(); else RelayStdout(e.Data, translateAria);
             };
             process.ErrorDataReceived += delegate(object sender, DataReceivedEventArgs e) {
-                if (e.Data == null) stderrDone.Set(); else Relay(e.Data, true, translateAria);
+                if (e.Data == null) stderrDone.Set();
+                else {
+                    string translated = translateAria ? TranslateAriaProgress(e.Data) : null;
+                    if (translated != null) {
+                        lock (ConsoleLock) Console.Out.WriteLine(translated);
+                    } else {
+                        lock (diagnostics) diagnostics.Add(e.Data);
+                    }
+                }
             };
             process.Start();
             process.BeginOutputReadLine();
@@ -85,6 +96,12 @@ static class YtDlpFallbackLauncher {
             int exitCode = process.ExitCode;
             process.Dispose();
             return exitCode;
+        }
+    }
+
+    static void EmitDiagnostics(IEnumerable<string> diagnostics) {
+        lock (ConsoleLock) {
+            foreach (string line in diagnostics) Console.Error.WriteLine(line);
         }
     }
 
@@ -110,9 +127,18 @@ static class YtDlpFallbackLauncher {
             return 127;
         }
         bool usesAria2 = args.Any(arg => arg.IndexOf("aria2", StringComparison.OrdinalIgnoreCase) >= 0);
-        int firstExit = Run(args, usesAria2);
-        if (firstExit == 0 || !usesAria2) return firstExit;
-        Console.Error.WriteLine("[speed-fallback] aria2c download failed; retrying once with yt-dlp native downloader.");
-        return Run(NativeArguments(args), false);
+        var firstDiagnostics = new List<string>();
+        int firstExit = Run(args, usesAria2, firstDiagnostics);
+        if (firstExit == 0) return 0;
+        if (!usesAria2) {
+            EmitDiagnostics(firstDiagnostics);
+            return firstExit;
+        }
+        var fallbackDiagnostics = new List<string>();
+        int fallbackExit = Run(NativeArguments(args), false, fallbackDiagnostics);
+        if (fallbackExit == 0) return 0;
+        EmitDiagnostics(firstDiagnostics);
+        EmitDiagnostics(fallbackDiagnostics);
+        return fallbackExit;
     }
 }
